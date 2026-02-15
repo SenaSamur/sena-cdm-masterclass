@@ -30,17 +30,61 @@ if menu == "1. Study Dashboard":
     
     
 
-# --- MODÜL 2: eCRF ---
+# --- MODÜL 2: eCRF DATA ENTRY (FDA & GCP COMPLIANT) ---
 elif menu == "2. eCRF Data Entry":
-    st.header("📝 eCRF Entry & Data Integrity")
-    with st.form("vital_signs"):
-        sub_id = st.text_input("Subject ID", "SUB-001")
-        sys_bp = st.number_input("Systolic BP", value=120)
-        reason = st.text_input("Değişiklik Nedeni", "")
-        submitted = st.form_submit_button("Veriyi Kaydet")
+    st.header("📋 FDA & GCP Compliant eCRF: Subject Enrollment")
+    st.info("GCP Gerekliliği: Veri girişi yapılmadan önce 'Informed Consent' (ICF) alınmış olmalıdır.")
+
+    with st.form("subject_enrollment"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📌 Administrative Data")
+            sub_id = st.text_input("Subject ID (Unique)", placeholder="Örn: 101-001")
+            # FDA gereği: Veri girişi yapanın kimliği ve tarih-saat otomatik tutulur (Audit Trail)
+            icf_date = st.date_input("Informed Consent Verilme Tarihi")
+            site_id = st.selectbox("Site ID", ["001 - İstanbul", "002 - Ankara", "003 - Londra"])
+
+        with col2:
+            st.subheader("👤 Demographics")
+            birth_year = st.number_input("Doğum Yılı", min_value=1940, max_value=2026, value=1990)
+            sex = st.radio("Cinsiyet (At Birth)", ["Male", "Female", "Undifferentiated"])
+            ethnicity = st.selectbox("Ethnicity (FDA Requirement)", ["Hispanic or Latino", "Not Hispanic or Latino", "Unknown"])
+            race = st.multiselect("Race", ["White", "Black or African American", "Asian", "Other"])
+
+        st.divider()
+        st.subheader("🩺 Clinical Baseline")
+        weight = st.number_input("Weight (kg)", min_value=30.0, max_value=250.0, step=0.1)
+        medical_history = st.text_area("Önemli Tıbbi Geçmiş (Medical History)")
+
+        # Audit Trail Nedeni (FDA 21 CFR Part 11 gereği)
+        st.warning("⚠️ Önemli: Eğer bu veriyi güncelliyorsanız, aşağıya 'Change Reason' girmek zorunludur.")
+        change_reason = st.text_input("Reason for Change / Entry")
+
+        # Form Submit
+        submitted = st.form_submit_button("Submit to Database")
+
         if submitted:
-            st.session_state.audit_log.append({"Timestamp": datetime.now(), "Sub": sub_id, "Val": sys_bp, "Reason": reason})
-            st.success("Kaydedildi!")
+            # GCP Edit Check 1: ICF tarihi bugünden sonra olamaz
+            if icf_date > datetime.now().date():
+                st.error("🚩 GCP Error: Onay tarihi gelecek bir tarih olamaz!")
+            
+            # GCP Edit Check 2: Zorunlu alan kontrolü
+            elif not sub_id or not change_reason:
+                st.error("🚩 FDA Error: Subject ID ve Change Reason boş bırakılamaz (Data Integrity).")
+            
+            else:
+                # Veriyi Audit Log'a yazma
+                new_entry = {
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "User": "Sena_CDM_Lead",
+                    "Subject": sub_id,
+                    "ICF_Date": str(icf_date),
+                    "Action": "Data Entry",
+                    "Reason": change_reason
+                }
+                st.session_state.audit_log.append(new_entry)
+                st.success(f"✅ Subject {sub_id} başarıyla kaydedildi. Audit trail oluşturuldu.")
 
 # --- MODÜL 3: QUERY ---
 elif menu == "3. Query Management":
