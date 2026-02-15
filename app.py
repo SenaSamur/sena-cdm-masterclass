@@ -2,80 +2,81 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Uygulama Başlığı ve Sidebar
-st.set_page_config(page_title="Sena CDM Workbench", layout="wide")
-st.sidebar.title("🛠️ CDM İş Akışı")
-menu = st.sidebar.radio("Modül Seçiniz:", 
-    ["1. Study Design (eCRF)", "2. Data Entry & Edit Checks", "3. Query Management", "4. Medical Coding"])
+st.set_page_config(page_title="Sena Pro CDM Tool", layout="wide")
 
-# --- MODÜL 1: STUDY DESIGN ---
-if menu == "1. Study Design (eCRF)":
-    st.header("📋 eCRF Tasarım Modülü (Hafta 2)")
-    st.info("Burada protokolü veri mimarisine çeviriyoruz.")
-    
-    crf_data = {
-        "Field Label": ["Subject ID", "Visit Date", "Systolic BP", "Diastolic BP", "Adverse Event?"],
-        "Variable Name": ["SUBJID", "VISDAT", "SYSBP", "DIABP", "AE_YN"],
-        "Type": ["Numeric", "Date", "Number", "Number", "Boolean"],
-        "Validation": ["Required", "Current/Past", "30-250", "20-150", "Required"]
-    }
-    st.table(pd.DataFrame(crf_data))
-    st.success("Çıktı: CRF Specification v1.0 hazır.")
+# --- APP STATE (Veri Depolama Simülasyonu) ---
+if 'audit_log' not in st.session_state:
+    st.session_state.audit_log = []
 
-# --- MODÜL 2: DATA ENTRY & EDIT CHECKS ---
-elif menu == "2. Data Entry & Edit Checks":
-    st.header("⌨️ Veri Girişi ve Otomatik Kontroller (Hafta 3)")
+# Sidebar
+st.sidebar.title("🏥 Clinical Data Ops")
+menu = st.sidebar.selectbox("İşlem Seçiniz:", 
+    ["Study Dashboard", "eCRF Data Entry", "SAE Reconciliation", "Audit Trail Explorer"])
+
+# --- MODÜL 1: DASHBOARD ---
+if menu == "Study Dashboard":
+    st.header("📊 Study Oversight Dashboard")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Subjects", "120", "+2 today")
+    col2.metric("Open Queries", "14", "-3")
+    col3.metric("Database Lock Readiness", "85%", "Phase: Cleaning")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Veri Giriş Formu")
-        sub_id = st.text_input("Subject ID", "1001")
-        sys_bp = st.number_input("Systolic BP (mmHg)", value=120)
-        dia_bp = st.number_input("Diastolic BP (mmHg)", value=80)
-        ae_status = st.selectbox("Adverse Event var mı?", ["Hayır", "Evet"])
+    
+
+# --- MODÜL 2: eCRF & AUDIT TRAIL ---
+elif menu == "eCRF Data Entry":
+    st.header("📝 eCRF Entry & Data Integrity")
+    st.info("Not: Her değişiklik 'Audit Trail' altına kaydedilir.")
+    
+    with st.form("vital_signs"):
+        sub_id = st.text_input("Subject ID", "SUB-001")
+        sys_bp = st.number_input("Systolic BP", value=120)
+        reason = st.text_input("Değişiklik Nedeni (Eğer veri güncelleniyorsa)", "")
         
-    with col2:
-        st.subheader("Otomatik Edit Checks (DVP)")
-        # Gerçek zamanlı kontrol simülasyonu
-        if sys_bp > 200 or sys_bp < 70:
-            st.error(f"🚩 🚩 [SYSBP_RANGE]: {sys_bp} değeri klinik sınırların dışında! (70-200)")
-        if sys_bp <= dia_bp:
-            st.error("🚩 [BP_CONSISTENCY]: Sistolik değer Diastolikten küçük veya eşit olamaz.")
-        if ae_status == "Evet":
-            st.warning("🔔 [AE_RECON]: Lütfen AE formunu doldurmayı unutmayın.")
-        else:
-            st.success("✅ Veri şu anki kurallara göre temiz.")
+        submitted = st.form_submit_button("Veriyi Kaydet")
+        
+        if submitted:
+            # Gerçek Dünya Edit Check: Sistolik ve Diastolik mantığı
+            if sys_bp > 200:
+                st.error("🚩 Otomatik Query: Değer fizyolojik sınır dışı. Lütfen kontrol edin.")
+            
+            # Audit Trail Kaydı
+            log_entry = {
+                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "User": "Sena_CDM_Lead",
+                "Subject": sub_id,
+                "Field": "SYSBP",
+                "New Value": sys_bp,
+                "Reason": reason if reason else "Initial Entry"
+            }
+            st.session_state.audit_log.append(log_entry)
+            st.success("Veri başarıyla kaydedildi ve denetim izi oluşturuldu.")
 
-# --- MODÜL 3: QUERY MANAGEMENT ---
-elif menu == "3. Query Management":
-    st.header("❓ Query (Sorgu) Yönetimi (Hafta 4)")
+# --- MODÜL 3: SAE RECONCILIATION (Kritik CDM Görevi) ---
+elif menu == "SAE Reconciliation":
+    st.header("🔄 AE / SAE Reconciliation")
+    st.write("Aşağıdaki tabloda Klinik Veritabanı (EDC) ile Güvenlik Veritabanı (Safety DB) arasındaki uyumsuzluklar listelenmiştir.")
     
-    queries = pd.DataFrame([
-        {"ID": "Q1", "Field": "SYSBP", "Issue": "Value 12 mmHg is improbable", "Status": "Open", "Aging": "3 Days"},
-        {"ID": "Q2", "Field": "VISDAT", "Issue": "Future date entered", "Status": "Answered", "Aging": "1 Day"},
-    ])
+    recon_data = pd.DataFrame({
+        "Subject ID": ["SUB-001", "SUB-005", "SUB-012"],
+        "EDC Term": ["Baş ağrısı", "Miyokard Enfarktüsü", "Bulantı"],
+        "Safety DB Term": ["Baş ağrısı", "N/A (Eksik)", "Gastrit"],
+        "Status": ["✅ Match", "❌ Missing in Safety", "⚠️ Mismatch"]
+    })
     
-    st.dataframe(queries, use_container_width=True)
+    st.table(recon_data)
     
-    st.subheader("Yeni Query Oluştur")
-    q_text = st.text_area("Siteye mesajınız:", placeholder="Lütfen kaynak dökümanı kontrol ederek değeri düzeltiniz...")
-    if st.button("Query Gönder"):
-        st.info("Query sisteme işlendi ve merkeze iletildi.")
+    
+    
+    if st.button("Uyumsuzluklar için Query Başlat"):
+        st.warning("Uyumsuzluk tespit edilen 2 vaka için sistem otomatik sorgu oluşturdu.")
 
-# --- MODÜL 4: MEDICAL CODING ---
-elif menu == "4. Medical Coding":
-    st.header("🧬 Medical Coding (MedDRA) (Hafta 6)")
-    
-    verbatim = st.text_input("Sahanın girdiği terim (Verbatim):", "Mide yanması ve ağrı")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**MedDRA Hiyerarşisi**")
-        st.code("""
-        LLT: Mide yanması
-        PT: Gastrointestinal ağrı
-        SOC: Gastrointestinal hastalıklar
-        """)
-    with col2:
-        if st.button("Kodu Onayla"):
-            st.success(f"'{verbatim}' terimi MedDRA 26.1 ile başarıyla kodlandı.")
+# --- MODÜL 4: AUDIT TRAIL EXPLORER ---
+elif menu == "Audit Trail Explorer":
+    st.header("🔍 Audit Trail (21 CFR Part 11)")
+    if st.session_state.audit_log:
+        df_log = pd.DataFrame(st.session_state.audit_log)
+        st.dataframe(df_log, use_container_width=True)
+        st.download_button("Audit Trail'i Export Et (CSV)", df_log.to_csv(), "audit_trail.csv")
+    else:
+        st.write("Henüz bir işlem kaydı yok.")
